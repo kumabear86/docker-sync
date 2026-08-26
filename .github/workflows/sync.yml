@@ -1,6 +1,6 @@
-name: Sync Immich Images to Aliyun ACR
+name: Sync Immich Fixed Images to Aliyun ACR
 on:
-  workflow_dispatch:
+  workflow_dispatch: # GitHub 页面手动触发
 
 jobs:
   sync:
@@ -13,7 +13,7 @@ jobs:
           username: ${{ secrets.ALIYUN_USERNAME }}
           password: ${{ secrets.ALIYUN_PASSWORD }}
 
-      - name: Pull ghcr.io images -> retag -> push ACR
+      - name: Pull ghcr.io images → retag → push ACR(with retry)
         run: |
           set -e
           MAX_RETRY=3
@@ -37,12 +37,10 @@ jobs:
             exit 1
           }
 
-          # 1. Immich 核心服务 (使用官方标准的 release 标签)
-          # sync_image ghcr.io/immich-app/immich-server:release registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-server:release
-          # sync_image ghcr.io/immich-app/immich-machine-learning:release registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-machine-learning:release
+          # 同步 Immich v1.129.0 匹配的全部 4 个固定镜像
+          sync_image ghcr.io/immich-app/immich-server:v1.129.0 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-server:v1.129.0
+          sync_image ghcr.io/immich-app/immich-machine-learning:v1.129.0 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-machine-learning:v1.129.0
+          sync_image ghcr.io/immich-app/postgres:16-vectorchord0.3.0-pgvectors0.3.0 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-postgres:16-vectorchord0.3.0-pgvectors0.3.0
+          sync_image docker.io/valkey/valkey:8.0-alpine registry.cn-shanghai.aliyuncs.com/rocm-forge/valkey:8.0-alpine
 
-          # 2. 数据库与缓存中间件
-          sync_image tensorchord/pgvecto-rs:pg16-v0.2.0 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-postgres:pg16-v0.2.0
-          sync_image valkey/valkey:8-alpine registry.cn-shanghai.aliyuncs.com/rocm-forge/valkey:8-alpine
-
-          echo "==== 镜像同步全部完成 ===="
+          echo "==== 本次全量同步完成 ===="
