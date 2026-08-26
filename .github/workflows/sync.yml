@@ -7,9 +7,6 @@ on:
         description: 'Immich Target Version Tag'
         required: true
         default: 'v3.1.0'
-  push:
-    branches:
-      - main
 
 env:
   IMMICH_VERSION: ${{ github.event.inputs.immich_version || 'v3.1.0' }}
@@ -23,7 +20,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 使用你配置的账户和密码登录阿里云上海 ACR
       - name: Log in to Aliyun ACR
         uses: docker/login-action@v3
         with:
@@ -31,9 +27,23 @@ jobs:
           username: ${{ secrets.ALIYUN_USERNAME }}
           password: ${{ secrets.ALIYUN_PASSWORD }}
 
-# 4. Valkey (Redis 替代品) 镜像
-      - name: Pull, Tag and Push Valkey
+      # 1. Server 镜像
+      - name: Pull, Tag and Push Immich Server
         run: |
-          docker pull valkey/valkey:8.0-alpine
-          docker tag valkey/valkey:8.0-alpine ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/valkey:8.0-alpine
-          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/valkey:8.0-alpine
+          docker pull ghcr.io/immich-app/immich-server:${{ env.IMMICH_VERSION }}
+          docker tag ghcr.io/immich-app/immich-server:${{ env.IMMICH_VERSION }} ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-server:${{ env.IMMICH_VERSION }}
+          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-server:${{ env.IMMICH_VERSION }}
+
+      # 2. Machine Learning 镜像
+      - name: Pull, Tag and Push Immich Machine Learning
+        run: |
+          docker pull ghcr.io/immich-app/immich-machine-learning:${{ env.IMMICH_VERSION }}
+          docker tag ghcr.io/immich-app/immich-machine-learning:${{ env.IMMICH_VERSION }} ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-machine-learning:${{ env.IMMICH_VERSION }}
+          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-machine-learning:${{ env.IMMICH_VERSION }}
+
+      # 3. 官方原生 PGVector 数据库镜像（解决 No vector extension 报错）
+      - name: Pull, Tag and Push Database
+        run: |
+          docker pull pgvector/pgvector:pg16
+          docker tag pgvector/pgvector:pg16 ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/pgvector:pg16
+          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/pgvector:pg16
