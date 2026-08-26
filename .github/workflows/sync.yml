@@ -13,6 +13,8 @@ on:
 
 env:
   IMMICH_VERSION: ${{ github.event.inputs.immich_version || 'v3.1.0' }}
+  REGISTRY: 'registry.cn-shanghai.aliyuncs.com'
+  NAMESPACE: 'rocm-forge'
 
 jobs:
   sync-images:
@@ -21,11 +23,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 使用你创建的 ALIYUN_USERNAME 和 ALIYUN_PASSWORD
+      # 使用你配置的账户和密码登录阿里云上海 ACR
       - name: Log in to Aliyun ACR
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.ACR_REGISTRY }}
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.ALIYUN_USERNAME }}
           password: ${{ secrets.ALIYUN_PASSWORD }}
 
@@ -33,19 +35,19 @@ jobs:
       - name: Pull, Tag and Push Immich Server
         run: |
           docker pull ghcr.io/immich-app/immich-server:${{ env.IMMICH_VERSION }}
-          docker tag ghcr.io/immich-app/immich-server:${{ env.IMMICH_VERSION }} ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/immich-server:${{ env.IMMICH_VERSION }}
-          docker push ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/immich-server:${{ env.IMMICH_VERSION }}
+          docker tag ghcr.io/immich-app/immich-server:${{ env.IMMICH_VERSION }} ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-server:${{ env.IMMICH_VERSION }}
+          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-server:${{ env.IMMICH_VERSION }}
 
       # 2. Machine Learning 镜像
       - name: Pull, Tag and Push Immich Machine Learning
         run: |
           docker pull ghcr.io/immich-app/immich-machine-learning:${{ env.IMMICH_VERSION }}
-          docker tag ghcr.io/immich-app/immich-machine-learning:${{ env.IMMICH_VERSION }} ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/immich-machine-learning:${{ env.IMMICH_VERSION }}
-          docker push ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/immich-machine-learning:${{ env.IMMICH_VERSION }}
+          docker tag ghcr.io/immich-app/immich-machine-learning:${{ env.IMMICH_VERSION }} ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-machine-learning:${{ env.IMMICH_VERSION }}
+          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-machine-learning:${{ env.IMMICH_VERSION }}
 
-      # 3. PostgreSQL 兼容数据库镜像 (pg16-v0.2.0)
+      # 3. PostgreSQL 数据库镜像 (pg16-v0.2.0)
       - name: Pull, Tag and Push Database
         run: |
           docker pull tensorchord/pgvecto-rs:pg16-v0.2.0
-          docker tag tensorchord/pgvecto-rs:pg16-v0.2.0 ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/pgvecto-rs:pg16-v0.2.0
-          docker push ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/pgvecto-rs:pg16-v0.2.0
+          docker tag tensorchord/pgvecto-rs:pg16-v0.2.0 ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/pgvecto-rs:pg16-v0.2.0
+          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/pgvecto-rs:pg16-v0.2.0
