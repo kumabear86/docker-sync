@@ -31,23 +31,9 @@ jobs:
           username: ${{ secrets.ALIYUN_USERNAME }}
           password: ${{ secrets.ALIYUN_PASSWORD }}
 
-      # 1. Server 镜像
-      - name: Pull, Tag and Push Immich Server
+# 4. Valkey (Redis 替代品) 镜像
+      - name: Pull, Tag and Push Valkey
         run: |
-          docker pull ghcr.io/immich-app/immich-server:${{ env.IMMICH_VERSION }}
-          docker tag ghcr.io/immich-app/immich-server:${{ env.IMMICH_VERSION }} ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-server:${{ env.IMMICH_VERSION }}
-          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-server:${{ env.IMMICH_VERSION }}
-
-      # 2. Machine Learning 镜像
-      - name: Pull, Tag and Push Immich Machine Learning
-        run: |
-          docker pull ghcr.io/immich-app/immich-machine-learning:${{ env.IMMICH_VERSION }}
-          docker tag ghcr.io/immich-app/immich-machine-learning:${{ env.IMMICH_VERSION }} ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-machine-learning:${{ env.IMMICH_VERSION }}
-          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/immich-machine-learning:${{ env.IMMICH_VERSION }}
-
-      # 3. PostgreSQL 数据库镜像 (pg16-v0.2.0)
-      - name: Pull, Tag and Push Database
-        run: |
-          docker pull tensorchord/pgvecto-rs:pg16-v0.2.0
-          docker tag tensorchord/pgvecto-rs:pg16-v0.2.0 ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/pgvecto-rs:pg16-v0.2.0
-          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/pgvecto-rs:pg16-v0.2.0
+          docker pull valkey/valkey:8.0-alpine
+          docker tag valkey/valkey:8.0-alpine ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/valkey:8.0-alpine
+          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/valkey:8.0-alpine
