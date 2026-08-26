@@ -1,46 +1,47 @@
-name: Sync Immich Fixed Images to Aliyun ACR
+name: Sync Immich Images to Aliyun ACR
+
 on:
-  workflow_dispatch: # GitHub 页面手动触发
+  workflow_dispatch:
+    inputs:
+      immich_version:
+        description: 'Immich Target Version Tag'
+        required: true
+        default: 'v3.1.0'
+
+env:
+  IMMICH_VERSION: ${{ github.event.inputs.immich_version || 'v3.1.0' }}
 
 jobs:
-  sync:
+  sync-images:
     runs-on: ubuntu-latest
     steps:
-      - name: Login to Aliyun ACR
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Log in to Aliyun ACR
         uses: docker/login-action@v3
         with:
-          registry: registry.cn-shanghai.aliyuncs.com
-          username: ${{ secrets.ALIYUN_USERNAME }}
-          password: ${{ secrets.ALIYUN_PASSWORD }}
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Pull ghcr.io images → retag → push ACR(with retry)
+      # 1. Server 镜像
+      - name: Pull, Tag and Push Immich Server
         run: |
-          set -e
-          MAX_RETRY=3
+          docker pull ghcr.io/immich-app/immich-server:${{ env.IMMICH_VERSION }}
+          docker tag ghcr.io/immich-app/immich-server:${{ env.IMMICH_VERSION }} ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/immich-server:${{ env.IMMICH_VERSION }}
+          docker push ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/immich-server:${{ env.IMMICH_VERSION }}
 
-          sync_image() {
-            local SRC="$1"
-            local DST="$2"
-            echo "==================== Processing $SRC ===================="
-            for ((attempt=1; attempt<=MAX_RETRY; attempt++)); do
-              echo "Attempt $attempt / $MAX_RETRY pull $SRC"
-              if docker pull "$SRC"; then
-                docker tag "$SRC" "$DST"
-                docker push "$DST"
-                echo "✅ SUCCESS: $SRC → $DST"
-                return 0
-              fi
-              echo "⚠️ Pull failed, sleep 8s for retry..."
-              sleep 8
-            done
-            echo "❌ FAILED after ${MAX_RETRY} retries: $SRC"
-            exit 1
-          }
+      # 2. Machine Learning 镜像
+      - name: Pull, Tag and Push Immich Machine Learning
+        run: |
+          docker pull ghcr.io/immich-app/immich-machine-learning:${{ env.IMMICH_VERSION }}
+          docker tag ghcr.io/immich-app/immich-machine-learning:${{ env.IMMICH_VERSION }} ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/immich-machine-learning:${{ env.IMMICH_VERSION }}
+          docker push ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/immich-machine-learning:${{ env.IMMICH_VERSION }}
 
-          # 同步 Immich v1.129.0 匹配的全部 4 个固定镜像
-          sync_image ghcr.io/immich-app/immich-server:v1.129.0 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-server:v1.129.0
-          sync_image ghcr.io/immich-app/immich-machine-learning:v1.129.0 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-machine-learning:v1.129.0
-          sync_image ghcr.io/immich-app/postgres:16-vectorchord0.3.0-pgvectors0.3.0 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-postgres:16-vectorchord0.3.0-pgvectors0.3.0
-          sync_image docker.io/valkey/valkey:8.0-alpine registry.cn-shanghai.aliyuncs.com/rocm-forge/valkey:8.0-alpine
-
-          echo "==== 本次全量同步完成 ===="
+      # 3. Postgres 数据库镜像（选用兼容性最好的 pg16-v0.2.0）
+      - name: Pull, Tag and Push Database
+        run: |
+          docker pull tensorchord/pgvecto-rs:pg16-v0.2.0
+          docker tag tensorchord/pgvecto-rs:pg16-v0.2.0 ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/pgvecto-rs:pg16-v0.2.0
+          docker push ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/pgvecto-rs:pg16-v0.2.0
