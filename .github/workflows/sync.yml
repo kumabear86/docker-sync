@@ -1,6 +1,7 @@
 name: Sync Immich Images to Aliyun ACR
 on:
-  workflow_dispatch: # 允许GitHub页面手动触发
+  workflow_dispatch: # GitHub页面手动触发
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -12,24 +13,37 @@ jobs:
           username: ${{ secrets.ALIYUN_USERNAME }}
           password: ${{ secrets.ALIYUN_PASSWORD }}
 
-      - name: Pull ghcr.io images → retag → push ACR
+      - name: Pull ghcr.io images → retag → push ACR(with retry)
         run: |
-          # immich-server
-          docker pull ghcr.io/immich-app/immich-server:v3
-          docker tag ghcr.io/immich-app/immich-server:v3 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-server:v3
-          docker push registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-server:v3
+          set -e
+          MAX_RETRY=3
 
-          # immich-machine-learning AI模型服务
-          docker pull ghcr.io/immich-app/immich-machine-learning:v3
-          docker tag ghcr.io/immich-app/immich-machine-learning:v3 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-machine-learning:v3
-          docker push registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-machine-learning:v3
+          sync_image() {
+            local SRC="$1"
+            local DST="$2"
+            echo "==================== Processing $SRC ===================="
+            for ((attempt=1; attempt<=MAX_RETRY; attempt++)); do
+              echo "Attempt $attempt / $MAX_RETRY pull $SRC"
+              if docker pull "$SRC"; then
+                docker tag "$SRC" "$DST"
+                docker push "$DST"
+                echo "✅ SUCCESS: $SRC → $DST"
+                return 0
+              fi
+              echo "⚠️ Pull failed, sleep 8s for retry..."
+              sleep 8
+            done
+            echo "❌ FAILED after ${MAX_RETRY} retries: $SRC"
+            exit 1
+          }
 
-          # immich postgres
-          docker pull ghcr.io/immich-app/postgres:v3
-          docker tag ghcr.io/immich-app/postgres:v3 registry.cn-shanghai.aliyuncs.com/rocm-forge/postgres:v3
-          docker push registry.cn-shanghai.aliyuncs.com/rocm-forge/postgres:v3
+          # ====== 下面2个ACR已经存在，本次跳过 ======
+          # sync_image ghcr.io/immich-app/immich-server:v3 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-server:v3
+          # sync_image ghcr.io/immich-app/immich-machine-learning:v3 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-machine-learning:v3
 
-          # valkey(redis替代)，源在docker.io
-          docker pull valkey/valkey:9
-          docker tag valkey/valkey:9 registry.cn-shanghai.aliyuncs.com/rocm-forge/valkey:9
-          docker push registry.cn-shanghai.aliyuncs.com/rocm-forge/valkey:9
+          # 需要补齐的镜像
+          sync_image ghcr.io/immich-app/immich-web:v3 registry.cn-shanghai.aliyuncs.com/rocm-forge/immich-web:v3
+          sync_image ghcr.io/immich-app/postgres:v3 registry.cn-shanghai.aliyuncs.com/rocm-forge/postgres:v3
+          sync_image valkey/valkey:9 registry.cn-shanghai.aliyuncs.com/rocm-forge/valkey:9
+
+          echo "==== 本次补漏同步完成 ===="
